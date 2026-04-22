@@ -1,6 +1,6 @@
 <?php
-require '../config/database.php';
-require '../classes/Api.php';
+require 'database.php';
+require 'Api.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
 $payment_id = $data['data']['id'] ?? null;
