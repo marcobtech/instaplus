@@ -13,7 +13,7 @@ app.post("/webhook", async (req, res) => {
 
         if (!payment_id) return res.sendStatus(200);
 
-        const token = process.env.MP_TOKEN_TEST;
+        const token = process.env.MP_TOKEN_PRD;
 
         const mp = await axios.get(
             `https://api.mercadopago.com/v1/payments/${payment_id}`,
