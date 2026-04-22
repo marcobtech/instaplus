@@ -72,6 +72,13 @@ app.post("/webhook", async (req, res) => {
     }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-    console.log("Webhook rodando");
+// app.listen(process.env.PORT || 3000, () => {
+//     console.log("Webhook rodando");
+// });
+
+// 👇 AQUI é onde entra o código da porta
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log("Webhook rodando na porta " + PORT);
 });
