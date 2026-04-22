@@ -10,6 +10,7 @@ app.post("/webhook", async (req, res) => {
 
     try {
         const payment_id = req.body?.data?.id;
+         console.log("WEBHOOK RECEBIDO:", req.body);
 
         if (!payment_id) return res.sendStatus(200);
 
