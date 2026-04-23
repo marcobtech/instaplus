@@ -13,8 +13,25 @@ class Api {
             ...data
         };
 
-        const res = await axios.post(this.api_url, new URLSearchParams(payload));
-        return res.data;
+        try {
+            const res = await axios.post(
+                this.api_url,
+                new URLSearchParams(payload),
+                {
+                    timeout: 10000 // 🔥 evita ETIMEDOUT
+                }
+            );
+
+            return res.data;
+
+        } catch (err) {
+            console.log("API ORDER ERROR:", err.message);
+
+            return {
+                error: true,
+                message: err.message
+            };
+        }
     }
 
     async status(order_id) {
@@ -24,8 +41,25 @@ class Api {
             order: order_id
         };
 
-        const res = await axios.post(this.api_url, new URLSearchParams(payload));
-        return res.data;
+        try {
+            const res = await axios.post(
+                this.api_url,
+                new URLSearchParams(payload),
+                {
+                    timeout: 10000
+                }
+            );
+
+            return res.data;
+
+        } catch (err) {
+            console.log("API STATUS ERROR:", err.message);
+
+            return {
+                error: true,
+                message: err.message
+            };
+        }
     }
 }
 
