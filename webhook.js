@@ -9,7 +9,7 @@ app.use(express.json());
 
 app.post("/webhook", async (req, res) => {
     try {
-         console.log("WEBHOOK RECEBIDO:", req.body);
+         console.log("WEBHOOK RECEBIDO1:", req.body);
         const payment_id = req.body?.data?.id;
         if (!payment_id) return res.sendStatus(200);
 
