@@ -290,4 +290,9 @@ async function processOrders() {
     }
 }
 
-setInterval(processOrders, 10000);
+async function loop() {
+    await processOrders();
+    setTimeout(loop, 10000);
+}
+
+loop();
