@@ -20,8 +20,7 @@ app.post("/webhook", async (req, res) => {
             {
                 headers: {
                     Authorization: `Bearer ${token}`
-                },
-                timeout: 10000
+                }
             }
         );
 
