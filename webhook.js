@@ -2,7 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const db = require("./database");
 const Api = require("./api");
-console.log("API IMPORTADA:", Api);
+console.log("API IMPORTADA1:", Api);
 
 const app = express();
 app.use(express.json());
