@@ -291,6 +291,7 @@ async function processOrders() {
 }
 
 async function loop() {
+    console.log("Worker iniciado...");
     await processOrders();
     setTimeout(loop, 10000);
 }
