@@ -243,3 +243,49 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log("Webhook rodando na porta " + PORT);
 });
+
+async function processOrders() {
+    const [orders] = await db.query(
+        "SELECT * FROM orders WHERE status='queued' LIMIT 5"
+    );
+
+    for (const order of orders) {
+
+        await db.query(
+            "UPDATE orders SET status='processing' WHERE id=? AND status='queued'",
+            [order.id]
+        );
+
+        const api = new Api();
+
+        try {
+            const result = await api.order({
+                service: 1,
+                link: order.link,
+                quantity: order.quantity
+            });
+
+            if (result?.order) {
+                await db.query(
+                    "UPDATE orders SET status='completed', external_id=? WHERE id=?",
+                    [result.order, order.id]
+                );
+            } else {
+                await db.query(
+                    "UPDATE orders SET status='error' WHERE id=?",
+                    [order.id]
+                );
+            }
+
+        } catch (err) {
+            console.log("WORKER ERROR:", err.message);
+
+            await db.query(
+                "UPDATE orders SET status='error' WHERE id=?",
+                [order.id]
+            );
+        }
+    }
+}
+
+setInterval(processOrders, 10000);
