@@ -4,8 +4,15 @@ const db = require("./database");
 const Api = require("./api");
 console.log("API IMPORTADA1:", Api);
 
+
+
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    console.log("📡 HIT:", req.method, req.url);
+    next();
+});
 
 app.post("/webhook", async (req, res) => {
     try {
