@@ -84,7 +84,7 @@ async function processOrders() {
             console.log("📡 Enviando para API externa...");
 
             const result = await api.order({
-                service: 1284,
+                service: 1289,
                 link: order.link,
                 quantity: order.quantity
             });
