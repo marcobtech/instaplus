@@ -14,9 +14,56 @@ app.use((req, res, next) => {
     next();
 });
 
+// app.post("/webhook", async (req, res) => {
+//     try {
+//          console.log("WEBHOOK RECEBIDO1:", req.body);
+//         const payment_id = req.body?.data?.id;
+//         if (!payment_id) return res.sendStatus(200);
+
+//         const token = process.env.MP_TOKEN_PRD;
+
+//         const mp = await axios.get(
+//             `https://api.mercadopago.com/v1/payments/${payment_id}`,
+//             {
+//                 headers: {
+//                     Authorization: `Bearer ${token}`
+//                 }
+//             }
+//         );
+
+//         const payment = mp.data;
+
+//         if (payment.status !== "approved") {
+//             return res.sendStatus(200);
+//         }
+
+//         const [rows] = await db.query(
+//             "SELECT * FROM orders WHERE txid = ?",
+//             [payment_id]
+//         );
+
+//         const order = rows[0];
+
+//         if (!order) return res.sendStatus(200);
+
+//         // 🔥 TRAVA ANTI DUPLICAÇÃO
+//         await db.query(
+//             "UPDATE orders SET status='queued' WHERE id=? AND status='pending'",
+//             [order.id]
+//         );
+
+//         return res.sendStatus(200);
+
+//     } catch (err) {
+//         console.log("WEBHOOK ERROR:", err.message);
+//         return res.sendStatus(200);
+//     }
+// });
+
 app.post("/webhook", async (req, res) => {
     try {
-         console.log("WEBHOOK RECEBIDO1:", req.body);
+        console.log("WEBHOOK:", req.body);
+
         const payment_id = req.body?.data?.id;
         if (!payment_id) return res.sendStatus(200);
 
@@ -33,29 +80,22 @@ app.post("/webhook", async (req, res) => {
 
         const payment = mp.data;
 
-        if (payment.status !== "approved") {
-            return res.sendStatus(200);
+        console.log("STATUS REAL:", payment.status);
+
+        if (payment.status === "approved") {
+
+            await db.query(
+                "UPDATE orders SET status='queued' WHERE txid=? AND status='pending'",
+                [payment_id]
+            );
+
+            console.log("ORDER ENFILEIRADA");
         }
-
-        const [rows] = await db.query(
-            "SELECT * FROM orders WHERE txid = ?",
-            [payment_id]
-        );
-
-        const order = rows[0];
-
-        if (!order) return res.sendStatus(200);
-
-        // 🔥 TRAVA ANTI DUPLICAÇÃO
-        await db.query(
-            "UPDATE orders SET status='queued' WHERE id=? AND status='pending'",
-            [order.id]
-        );
 
         return res.sendStatus(200);
 
     } catch (err) {
-        console.log("WEBHOOK ERROR:", err.message);
+        console.log(err.message);
         return res.sendStatus(200);
     }
 });
