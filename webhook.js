@@ -12,7 +12,7 @@ app.listen(PORT, () => {
 });
 
 /**
- * 🔥 ENVIA PEDIDOS (FILA)
+ * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
  */
 async function processOrders() {
     console.log("📤 Processando fila...");
@@ -35,14 +35,14 @@ async function processOrders() {
 
         console.log(`➡️ Enviando pedido ${order.id} (${order.link})`);
 
-        // trava para evitar corrida
+        // 🔒 trava anti concorrência
         const [update] = await db.query(
             "UPDATE orders SET status='processing' WHERE id=? AND status='queued'",
             [order.id]
         );
 
         if (update.affectedRows === 0) {
-            console.log("⚠️ Pedido já foi processado por outro loop");
+            console.log("⚠️ Pedido já processado por outro worker");
             continue;
         }
 
@@ -114,7 +114,7 @@ async function checkOrderStatus() {
             const res = await api.status(order.external_id);
 
             if (!res || !res.status) {
-                console.log(`⚠️ Sem resposta válida ${order.id}`);
+                console.log(`⚠️ Sem resposta válida pedido ${order.id}`);
                 continue;
             }
 
@@ -122,12 +122,12 @@ async function checkOrderStatus() {
 
             console.log(`📊 Pedido ${order.id} → ${status}`);
 
-            // ainda rodando
+            // 🔄 AINDA PROCESSANDO
             if (['pending', 'processing', 'in progress'].includes(status)) {
                 continue;
             }
 
-            // finalizado
+            // ✅ FINALIZADO
             if (status === 'completed') {
 
                 await db.query(
@@ -138,15 +138,26 @@ async function checkOrderStatus() {
                 console.log(`🎉 Pedido ${order.id} FINALIZADO`);
             }
 
-            // erro
-            else if (['partial', 'canceled', 'cancelled'].includes(status)) {
+            // ⚠️ PARCIAL (você pode decidir tratar diferente)
+            else if (status === 'partial') {
 
                 await db.query(
-                    "UPDATE orders SET status='error' WHERE id=?",
+                    "UPDATE orders SET status='partial' WHERE id=?",
                     [order.id]
                 );
 
-                console.log(`❌ Pedido ${order.id} com erro`);
+                console.log(`⚠️ Pedido ${order.id} PARCIAL`);
+            }
+
+            // ❌ CANCELADO
+            else if (['canceled', 'cancelled'].includes(status)) {
+
+                await db.query(
+                    "UPDATE orders SET status='canceled' WHERE id=?",
+                    [order.id]
+                );
+
+                console.log(`❌ Pedido ${order.id} CANCELADO`);
             }
 
         } catch (err) {
@@ -162,7 +173,7 @@ async function loop() {
     try {
         console.log("\n🔁 =============================");
 
-        await processOrders();     // envia pedidos
+        await processOrders();     // envia novos pedidos
         await checkOrderStatus();  // atualiza status
 
     } catch (err) {
