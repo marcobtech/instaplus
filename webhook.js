@@ -1,174 +1,175 @@
 const express = require("express");
-const axios = require("axios");
 const db = require("./database");
 const Api = require("./api");
-console.log("API IMPORTADA1:", Api);
-
-
 
 const app = express();
 app.use(express.json());
 
-app.use((req, res, next) => {
-    console.log("📡 HIT:", req.method, req.url);
-    next();
-});
-
-// app.post("/webhook", async (req, res) => {
-//     try {
-//          console.log("WEBHOOK RECEBIDO1:", req.body);
-//         const payment_id = req.body?.data?.id;
-//         if (!payment_id) return res.sendStatus(200);
-
-//         const token = process.env.MP_TOKEN_PRD;
-
-//         const mp = await axios.get(
-//             `https://api.mercadopago.com/v1/payments/${payment_id}`,
-//             {
-//                 headers: {
-//                     Authorization: `Bearer ${token}`
-//                 }
-//             }
-//         );
-
-//         const payment = mp.data;
-
-//         if (payment.status !== "approved") {
-//             return res.sendStatus(200);
-//         }
-
-//         const [rows] = await db.query(
-//             "SELECT * FROM orders WHERE txid = ?",
-//             [payment_id]
-//         );
-
-//         const order = rows[0];
-
-//         if (!order) return res.sendStatus(200);
-
-//         // 🔥 TRAVA ANTI DUPLICAÇÃO
-//         await db.query(
-//             "UPDATE orders SET status='queued' WHERE id=? AND status='pending'",
-//             [order.id]
-//         );
-
-//         return res.sendStatus(200);
-
-//     } catch (err) {
-//         console.log("WEBHOOK ERROR:", err.message);
-//         return res.sendStatus(200);
-//     }
-// });
-
-app.post("/webhook", async (req, res) => {
-    try {
-        console.log("WEBHOOK:", req.body);
-
-        const payment_id = req.body?.data?.id;
-        if (!payment_id) return res.sendStatus(200);
-
-        const token = process.env.MP_TOKEN_PRD;
-
-        const mp = await axios.get(
-            `https://api.mercadopago.com/v1/payments/${payment_id}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            }
-        );
-
-        const payment = mp.data;
-
-        console.log("STATUS REAL:", payment.status);
-
-        if (payment.status === "approved") {
-
-            await db.query(
-                "UPDATE orders SET status='queued' WHERE txid=? AND status='pending'",
-                [payment_id]
-            );
-
-            console.log("ORDER ENFILEIRADA");
-        }
-
-        return res.sendStatus(200);
-
-    } catch (err) {
-        console.log(err.message);
-        return res.sendStatus(200);
-    }
-});
-
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Webhook rodando na porta " + PORT);
+    console.log("🚀 Worker rodando na porta " + PORT);
 });
 
+/**
+ * 🔥 ENVIA PEDIDOS (FILA)
+ */
 async function processOrders() {
-    console.log("🔄 Worker rodando...");
+    console.log("📤 Processando fila...");
 
-    const [orders] = await db.query(
-        "SELECT * FROM orders WHERE status='queued' LIMIT 5"
-    );
+    const [orders] = await db.query(`
+        SELECT * FROM orders o
+        WHERE o.status = 'queued'
+        AND NOT EXISTS (
+            SELECT 1 FROM orders 
+            WHERE link = o.link 
+            AND status = 'processing'
+        )
+        ORDER BY o.id ASC
+        LIMIT 5
+    `);
 
-    console.log("📦 Orders encontradas:", orders.length);
+    console.log(`📦 ${orders.length} pedidos prontos para envio`);
 
     for (const order of orders) {
 
-        console.log("➡️ Processando order:", order.id);
+        console.log(`➡️ Enviando pedido ${order.id} (${order.link})`);
 
-        await db.query(
+        // trava para evitar corrida
+        const [update] = await db.query(
             "UPDATE orders SET status='processing' WHERE id=? AND status='queued'",
             [order.id]
         );
 
+        if (update.affectedRows === 0) {
+            console.log("⚠️ Pedido já foi processado por outro loop");
+            continue;
+        }
+
         const api = new Api();
 
         try {
-            console.log("📡 Enviando para API externa...");
-
             const result = await api.order({
                 service: 1289,
                 link: order.link,
                 quantity: order.quantity
             });
 
-            console.log("📨 RESPOSTA API:", JSON.stringify(result, null, 2));
+            console.log("📨 RESPOSTA API:", result);
 
             if (result?.order) {
-                console.log("✅ Sucesso API:", result.order);
 
                 await db.query(
-                    "UPDATE orders SET status='completed', external_id=? WHERE id=?",
+                    "UPDATE orders SET external_id=?, status='processing' WHERE id=?",
                     [result.order, order.id]
                 );
 
+                console.log(`✅ Pedido ${order.id} enviado → external_id ${result.order}`);
+
             } else {
-                console.log("❌ API retornou erro lógico");
 
                 await db.query(
                     "UPDATE orders SET status='error', response=? WHERE id=?",
                     [JSON.stringify(result), order.id]
                 );
+
+                console.log(`❌ Erro API pedido ${order.id}`);
             }
 
         } catch (err) {
-            console.log("💥 ERRO WORKER:", err.message);
 
             await db.query(
                 "UPDATE orders SET status='error', response=? WHERE id=?",
                 [err.message, order.id]
             );
+
+            console.log(`💥 ERRO envio pedido ${order.id}:`, err.message);
         }
     }
 }
 
+/**
+ * 🔍 VERIFICA STATUS NO FORNECEDOR
+ */
+async function checkOrderStatus() {
+    console.log("🔎 Verificando status...");
+
+    const [orders] = await db.query(`
+        SELECT * FROM orders 
+        WHERE status = 'processing'
+        AND external_id IS NOT NULL
+        LIMIT 10
+    `);
+
+    if (orders.length === 0) {
+        console.log("😴 Nenhum pedido em processamento");
+        return;
+    }
+
+    const api = new Api();
+
+    for (const order of orders) {
+
+        try {
+            const res = await api.status(order.external_id);
+
+            if (!res || !res.status) {
+                console.log(`⚠️ Sem resposta válida ${order.id}`);
+                continue;
+            }
+
+            const status = res.status.toLowerCase();
+
+            console.log(`📊 Pedido ${order.id} → ${status}`);
+
+            // ainda rodando
+            if (['pending', 'processing', 'in progress'].includes(status)) {
+                continue;
+            }
+
+            // finalizado
+            if (status === 'completed') {
+
+                await db.query(
+                    "UPDATE orders SET status='completed' WHERE id=?",
+                    [order.id]
+                );
+
+                console.log(`🎉 Pedido ${order.id} FINALIZADO`);
+            }
+
+            // erro
+            else if (['partial', 'canceled', 'cancelled'].includes(status)) {
+
+                await db.query(
+                    "UPDATE orders SET status='error' WHERE id=?",
+                    [order.id]
+                );
+
+                console.log(`❌ Pedido ${order.id} com erro`);
+            }
+
+        } catch (err) {
+            console.log(`💥 ERRO status ${order.id}:`, err.message);
+        }
+    }
+}
+
+/**
+ * 🔁 LOOP PRINCIPAL
+ */
 async function loop() {
-    console.log("Worker rodando...");
-    await processOrders();
-    setTimeout(loop, 10000);
+    try {
+        console.log("\n🔁 =============================");
+
+        await processOrders();     // envia pedidos
+        await checkOrderStatus();  // atualiza status
+
+    } catch (err) {
+        console.log("💥 ERRO GERAL:", err.message);
+    }
+
+    setTimeout(loop, 10000); // roda a cada 10s
 }
 
 loop();
