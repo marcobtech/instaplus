@@ -121,6 +121,7 @@ async function checkOrderStatus() {
             const status = res.status.toLowerCase();
 
             console.log(`📊 Pedido ${order.id} → ${status}`);
+            
 
             // 🔄 AINDA PROCESSANDO
             if (['pending', 'processing', 'in progress'].includes(status)) {
