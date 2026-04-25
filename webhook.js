@@ -12,14 +12,14 @@ app.listen(PORT, () => {
 });
 
 app.post("/webhook", async (req, res) => {
-    try {
-        console.log("WEBHOOK:", req.body);
-        return res.sendStatus(200);
 
-    } catch (err) {
-        console.log(err.message);
+    if (req.body?.ping) {
         return res.sendStatus(200);
     }
+
+    console.log("WEBHOOK REAL:", req.body);
+
+    return res.sendStatus(200);
 });
 
 /**
