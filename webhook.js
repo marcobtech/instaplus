@@ -11,6 +11,17 @@ app.listen(PORT, () => {
     console.log("🚀 Worker rodando na porta " + PORT);
 });
 
+app.post("/webhook", async (req, res) => {
+    try {
+        console.log("WEBHOOK:", req.body);
+        return res.sendStatus(200);
+
+    } catch (err) {
+        console.log(err.message);
+        return res.sendStatus(200);
+    }
+});
+
 /**
  * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
  */
