@@ -26,7 +26,7 @@ app.post("/webhook", async (req, res) => {
  * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
  */
 async function processOrders() {
-    console.log("V1.0📤 Processando fila... ");
+    console.log("V1.1📤 Processando fila... ");
 
     const [orders] = await db.query(`
         SELECT * FROM orders o
@@ -61,7 +61,7 @@ async function processOrders() {
 
         try {
             const result = await api.order({
-                service: 1284,
+                service: order.service_id,
                 link: order.link,
                 quantity: order.quantity
             });
