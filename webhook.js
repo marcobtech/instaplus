@@ -11,16 +11,7 @@ app.listen(PORT, () => {
     console.log("🚀 Worker rodando na porta " + PORT);
 });
 
-app.post("/webhook", async (req, res) => {
 
-    if (req.body?.ping) {
-        return res.sendStatus(200);
-    }
-
-    console.log("WEBHOOK REAL:", req.body);
-
-    return res.sendStatus(200);
-});
 
 /**
  * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
