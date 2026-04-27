@@ -61,7 +61,7 @@ async function processOrders() {
 
         try {
             const result = await api.order({
-                service: 1289,
+                service: 1284,
                 link: order.link,
                 quantity: order.quantity
             });
