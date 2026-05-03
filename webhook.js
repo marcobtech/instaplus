@@ -32,6 +32,7 @@ async function processOrders() {
     const [orders] = await db.query(`
         SELECT * FROM orders o
         WHERE o.status = 'queued'
+        AND o.platform = 'instagram'
         AND NOT EXISTS (
             SELECT 1 FROM orders 
             WHERE link = o.link 
@@ -44,6 +45,11 @@ async function processOrders() {
     console.log(`📦 ${orders.length} pedidos prontos para envio`);
 
     for (const order of orders) {
+
+        if (order.platform !== 'instagram') {
+            console.log(`⏭️ Ignorando pedido ${order.id} (não é instagram)`);
+            continue;
+        }
 
         console.log(`➡️ Enviando pedido ${order.id} (${order.link})`);
 
