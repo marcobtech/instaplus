@@ -52,6 +52,9 @@ async function processOrders() {
             api = new Api();
         } else if (order.platform === 'tiktok') {
             api = new ApiTiktok();
+        } else {
+            console.log(`⚠️ Plataforma inválida pedido ${order.id}`);
+            continue;
         }
 
         console.log(`➡️ Enviando pedido ${order.id} (${order.link})`);
@@ -136,6 +139,9 @@ async function checkOrderStatus() {
             api = new Api();
         } else if (order.platform === 'tiktok') {
             api = new ApiTiktok();
+        } else {
+            console.log(`⚠️ Plataforma inválida pedido ${order.id}`);
+            continue;
         }
 
         try {
