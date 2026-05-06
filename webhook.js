@@ -70,7 +70,6 @@ async function processOrders() {
             continue;
         }
 
-        const api = new Api();
 
         try {
             const result = await api.order({
