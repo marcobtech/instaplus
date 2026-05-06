@@ -126,15 +126,17 @@ async function checkOrderStatus() {
         return;
     }
 
-    let api;
-
-    if (order.platform === 'instagram') {
-        api = new Api();
-    } else if (order.platform === 'tiktok') {
-        api = new ApiTiktok();
-    }
+    
 
     for (const order of orders) {
+
+        let api;
+
+        if (order.platform === 'instagram') {
+            api = new Api();
+        } else if (order.platform === 'tiktok') {
+            api = new ApiTiktok();
+        }
 
         try {
             const res = await api.status(order.external_id);
