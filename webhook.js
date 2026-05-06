@@ -28,7 +28,7 @@ app.post("/teste", async (req, res) => {
  * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
  */
 async function processOrders() {
-    console.log("V1.1📤 Processando fila... ");
+    console.log("V2.0📤 Processando fila... ");
 
     const [orders] = await db.query(`
         SELECT * FROM orders o
