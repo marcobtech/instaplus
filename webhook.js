@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("./database");
 const Api = require("./api");
+const ApiTiktok = require("./apiTiktok");
 
 const app = express();
 app.use(express.json());
@@ -32,7 +33,6 @@ async function processOrders() {
     const [orders] = await db.query(`
         SELECT * FROM orders o
         WHERE o.status = 'queued'
-        AND o.platform = 'instagram'
         AND NOT EXISTS (
             SELECT 1 FROM orders 
             WHERE link = o.link 
@@ -46,8 +46,14 @@ async function processOrders() {
 
     for (const order of orders) {
 
-        if (order.platform !== 'instagram') {
-            console.log(`⏭️ Ignorando pedido ${order.id} (não é instagram)`);
+        let api;
+
+        if (order.platform === 'instagram') {
+            api = new Api();
+        } else if (order.platform === 'tiktok') {
+            api = new ApiTiktok();
+        } else {
+            console.log(`⏭️ Plataforma inválida pedido ${order.id}`);
             continue;
         }
 
@@ -124,7 +130,15 @@ async function checkOrderStatus() {
         return;
     }
 
-    const api = new Api();
+    let api;
+
+    if (order.platform === 'instagram') {
+        api = new Api();
+    } else if (order.platform === 'tiktok') {
+        api = new ApiTiktok();
+    } else {
+        continue;
+    }
 
     for (const order of orders) {
 
