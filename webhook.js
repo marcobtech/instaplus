@@ -1,7 +1,8 @@
 const express = require("express");
 const db = require("./database");
-const Api = require("./api");
-const ApiTiktok = require("./apiTiktok");
+
+const Painelpro = require("./api");
+const Morethanpanel = require("./apiTiktok");
 
 const app = express();
 app.use(express.json());
@@ -23,62 +24,83 @@ app.post("/teste", async (req, res) => {
     return res.sendStatus(200);
 });
 
+/**
+ * 🔥 RESOLVE PROVIDER
+ */
+function getProviderApi(provider) {
+
+    if (!provider) {
+        return null;
+    }
+
+    provider = provider.toLowerCase();
+
+    switch (provider) {
+
+        case "painelpro":
+            return new Painelpro();
+
+        case "morethanpanel":
+            return new Morethanpanel();
+
+        default:
+            return null;
+    }
+}
 
 /**
- * 🔥 ENVIA PEDIDOS (FILA COM CONTROLE POR PERFIL)
+ * 🔥 ENVIA PEDIDOS
  */
 async function processOrders() {
-    console.log("V2.0📤 Processando fila... ");
+
+    console.log("V3.0📤 Processando fila...");
 
     const [orders] = await db.query(`
         SELECT * FROM orders o
         WHERE o.status = 'queued'
         AND NOT EXISTS (
-            SELECT 1 FROM orders 
-            WHERE link = o.link 
+            SELECT 1 FROM orders
+            WHERE link = o.link
             AND status = 'processing'
         )
         ORDER BY o.id ASC
         LIMIT 5
     `);
 
-    console.log(`📦 ${orders.length} pedidos prontos para envio`);
+    console.log(`📦 ${orders.length} pedidos`);
 
     for (const order of orders) {
 
-        let api;
+        const api = getProviderApi(order.provider);
 
-        if (order.platform === 'instagram') {
-            api = new Api();
-        } else if (order.platform === 'tiktok') {
-            api = new ApiTiktok();
-        } else {
-            console.log(`⚠️ Plataforma inválida pedido ${order.id}`);
+        if (!api) {
+            console.log(`⚠️ Provider inválido pedido ${order.id}`);
             continue;
         }
 
-        console.log(`➡️ Enviando pedido ${order.id} (${order.link})`);
+        console.log(`➡️ Pedido ${order.id}`);
+        console.log(`🏢 Provider: ${order.provider}`);
 
-        // 🔒 trava anti concorrência
+        // 🔒 trava concorrência
         const [update] = await db.query(
             "UPDATE orders SET status='processing' WHERE id=? AND status='queued'",
             [order.id]
         );
 
         if (update.affectedRows === 0) {
-            console.log("⚠️ Pedido já processado por outro worker");
+            console.log("⚠️ Já processado");
             continue;
         }
 
-
         try {
+
             const result = await api.order({
                 service: order.service_id,
                 link: order.link,
                 quantity: order.quantity
             });
 
-            console.log("📨 RESPOSTA API:", result);
+            console.log("📨 RESPOSTA:", result);
 
             if (result?.order) {
 
@@ -87,7 +109,7 @@ async function processOrders() {
                     [result.order, order.id]
                 );
 
-                console.log(`✅ Pedido ${order.id} enviado → external_id ${result.order}`);
+                console.log(`✅ Pedido ${order.id} enviado`);
 
             } else {
 
@@ -96,7 +118,7 @@ async function processOrders() {
                     [JSON.stringify(result), order.id]
                 );
 
-                console.log(`❌ Erro API pedido ${order.id}`);
+                console.log(`❌ Erro pedido ${order.id}`);
             }
 
         } catch (err) {
@@ -106,63 +128,58 @@ async function processOrders() {
                 [err.message, order.id]
             );
 
-            console.log(`💥 ERRO envio pedido ${order.id}:`, err.message);
+            console.log(`💥 ERRO pedido ${order.id}:`, err.message);
         }
     }
 }
 
 /**
- * 🔍 VERIFICA STATUS NO FORNECEDOR
+ * 🔍 VERIFICA STATUS
  */
 async function checkOrderStatus() {
+
     console.log("🔎 Verificando status...");
 
     const [orders] = await db.query(`
-        SELECT * FROM orders 
+        SELECT * FROM orders
         WHERE status = 'processing'
         AND external_id IS NOT NULL
         LIMIT 10
     `);
 
     if (orders.length === 0) {
-        console.log("😴 Nenhum pedido em processamento");
+        console.log("😴 Nenhum pedido");
         return;
     }
 
-    
-
     for (const order of orders) {
 
-        let api;
+        const api = getProviderApi(order.provider);
 
-        if (order.platform === 'instagram') {
-            api = new Api();
-        } else if (order.platform === 'tiktok') {
-            api = new ApiTiktok();
-        } else {
-            console.log(`⚠️ Plataforma inválida pedido ${order.id}`);
+        if (!api) {
+            console.log(`⚠️ Provider inválido pedido ${order.id}`);
             continue;
         }
 
         try {
+
             const res = await api.status(order.external_id);
 
             if (!res || !res.status) {
-                console.log(`⚠️ Sem resposta válida pedido ${order.id}`);
+                console.log(`⚠️ Sem status pedido ${order.id}`);
                 continue;
             }
 
             const status = res.status.toLowerCase();
 
             console.log(`📊 Pedido ${order.id} → ${status}`);
-            
 
-            // 🔄 AINDA PROCESSANDO
+            // 🔄 PROCESSANDO
             if (['pending', 'processing', 'in progress'].includes(status)) {
                 continue;
             }
 
-            // ✅ FINALIZADO
+            // ✅ COMPLETO
             if (status === 'completed') {
 
                 await db.query(
@@ -170,10 +187,10 @@ async function checkOrderStatus() {
                     [order.id]
                 );
 
-                console.log(`🎉 Pedido ${order.id} FINALIZADO`);
+                console.log(`🎉 Pedido ${order.id} concluído`);
             }
 
-            // ⚠️ PARCIAL (você pode decidir tratar diferente)
+            // ⚠️ PARCIAL
             else if (status === 'partial') {
 
                 await db.query(
@@ -181,7 +198,7 @@ async function checkOrderStatus() {
                     [order.id]
                 );
 
-                console.log(`⚠️ Pedido ${order.id} PARCIAL`);
+                console.log(`⚠️ Pedido ${order.id} parcial`);
             }
 
             // ❌ CANCELADO
@@ -192,30 +209,35 @@ async function checkOrderStatus() {
                     [order.id]
                 );
 
-                console.log(`❌ Pedido ${order.id} CANCELADO`);
+                console.log(`❌ Pedido ${order.id} cancelado`);
             }
 
         } catch (err) {
+
             console.log(`💥 ERRO status ${order.id}:`, err.message);
         }
     }
 }
 
 /**
- * 🔁 LOOP PRINCIPAL
+ * 🔁 LOOP
  */
 async function loop() {
-    try {
-        console.log("\n🔁 =============================");
 
-        await processOrders();     // envia novos pedidos
-        await checkOrderStatus();  // atualiza status
+    try {
+
+        console.log("\n🔁 =======================");
+
+        await processOrders();
+
+        await checkOrderStatus();
 
     } catch (err) {
+
         console.log("💥 ERRO GERAL:", err.message);
     }
 
-    setTimeout(loop, 10000); // roda a cada 10s
+    setTimeout(loop, 10000);
 }
 
 loop();
