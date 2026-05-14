@@ -24,6 +24,94 @@ app.post("/teste", async (req, res) => {
     return res.sendStatus(200);
 });
 
+app.post("/webhook/asaas", async (req, res) => {
+
+    try {
+
+        // 🔥 Asaas envia ping automático
+        if (req.body?.event === "PAYMENT_RECEIVED") {
+
+            console.log("💰 PAGAMENTO RECEBIDO");
+
+        }
+
+        console.log("📩 WEBHOOK ASAAS:");
+        console.log(JSON.stringify(req.body, null, 2));
+
+        const payment = req.body.payment;
+
+        if (!payment) {
+            return res.sendStatus(200);
+        }
+
+        const txid = payment.id;
+
+        const event = req.body.event;
+
+        console.log(`📌 EVENTO: ${event}`);
+        console.log(`💳 TXID: ${txid}`);
+
+        /**
+         * 🔥 PAGAMENTO RECEBIDO
+         */
+        if (
+            event === "PAYMENT_RECEIVED" ||
+            event === "PAYMENT_CONFIRMED"
+        ) {
+
+            // 🔥 atualiza pedido
+            const [update] = await db.query(`
+                UPDATE orders
+                SET status = 'queued'
+                WHERE txid = ?
+                AND status = 'pending'
+            `, [txid]);
+
+            console.log(`✅ Pedido atualizado`);
+            console.log(`📝 Rows: ${update.affectedRows}`);
+        }
+
+        /**
+         * ❌ PAGAMENTO VENCIDO
+         */
+        if (event === "PAYMENT_OVERDUE") {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'expired'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("⌛ PIX expirado");
+        }
+
+        /**
+         * ❌ PAGAMENTO ESTORNADO
+         */
+        if (
+            event === "PAYMENT_DELETED" ||
+            event === "PAYMENT_REFUNDED"
+        ) {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'refunded'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("💸 Pagamento estornado");
+        }
+
+        return res.sendStatus(200);
+
+    } catch (err) {
+
+        console.log("💥 ERRO WEBHOOK:", err.message);
+
+        return res.sendStatus(500);
+    }
+});
+
 /**
  * 🔥 RESOLVE PROVIDER
  */
