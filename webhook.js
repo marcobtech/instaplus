@@ -24,18 +24,15 @@ app.post("/teste", async (req, res) => {
     return res.sendStatus(200);
 });
 
-app.post("/webhook/asaas", async (req, res) => {
+/**
+ * 🔥 WEBHOOK ASAAS
+ */
+async function handleAsaasWebhook(req, res, env = "PRD") {
 
     try {
 
-        // 🔥 Asaas envia ping automático
-        if (req.body?.event === "PAYMENT_RECEIVED") {
+        console.log(`\n📩 WEBHOOK ASAAS ${env}`);
 
-            console.log("💰 PAGAMENTO RECEBIDO");
-
-        }
-
-        console.log("📩 WEBHOOK ASAAS:");
         console.log(JSON.stringify(req.body, null, 2));
 
         const payment = req.body.payment;
@@ -52,14 +49,13 @@ app.post("/webhook/asaas", async (req, res) => {
         console.log(`💳 TXID: ${txid}`);
 
         /**
-         * 🔥 PAGAMENTO RECEBIDO
+         * ✅ PAGAMENTO RECEBIDO
          */
         if (
             event === "PAYMENT_RECEIVED" ||
             event === "PAYMENT_CONFIRMED"
         ) {
 
-            // 🔥 atualiza pedido
             const [update] = await db.query(`
                 UPDATE orders
                 SET status = 'queued'
@@ -72,7 +68,7 @@ app.post("/webhook/asaas", async (req, res) => {
         }
 
         /**
-         * ❌ PAGAMENTO VENCIDO
+         * ⌛ PIX EXPIRADO
          */
         if (event === "PAYMENT_OVERDUE") {
 
@@ -86,7 +82,7 @@ app.post("/webhook/asaas", async (req, res) => {
         }
 
         /**
-         * ❌ PAGAMENTO ESTORNADO
+         * 💸 ESTORNO
          */
         if (
             event === "PAYMENT_DELETED" ||
@@ -106,10 +102,26 @@ app.post("/webhook/asaas", async (req, res) => {
 
     } catch (err) {
 
-        console.log("💥 ERRO WEBHOOK:", err.message);
+        console.log(`💥 ERRO WEBHOOK ${env}:`, err.message);
 
         return res.sendStatus(500);
     }
+}
+
+/**
+ * 🧪 SANDBOX
+ */
+app.post("/webhook/asaas/hml", async (req, res) => {
+
+    return handleAsaasWebhook(req, res, "HML");
+});
+
+/**
+ * 🚀 PRODUÇÃO
+ */
+app.post("/webhook/asaas/prd", async (req, res) => {
+
+    return handleAsaasWebhook(req, res, "PRD");
 });
 
 /**
