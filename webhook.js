@@ -124,6 +124,15 @@ app.post("/webhook/asaas/prd", async (req, res) => {
     return handleAsaasWebhook(req, res, "PRD");
 });
 
+
+/**
+ * 🚀 SANDBOX Marco
+ */
+app.post("/webhook/asaas", async (req, res) => {
+
+    return handleAsaasWebhook(req, res, "HML");
+});
+
 /**
  * 🔥 RESOLVE PROVIDER
  */
