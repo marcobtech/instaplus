@@ -111,7 +111,7 @@ async function handleAsaasWebhook(req, res, env = "PRD") {
 /**
  * 🧪 SANDBOX
  */
-app.post("/webhook/asaas/hml", async (req, res) => {
+app.post("/webhook/mp/hml", async (req, res) => {
 
     return handleAsaasWebhook(req, res, "HML");
 });
@@ -119,7 +119,7 @@ app.post("/webhook/asaas/hml", async (req, res) => {
 /**
  * 🚀 PRODUÇÃO
  */
-app.post("/webhook/asaas/prd", async (req, res) => {
+app.post("/webhook/mp/prd", async (req, res) => {
 
     return handleAsaasWebhook(req, res, "PRD");
 });
