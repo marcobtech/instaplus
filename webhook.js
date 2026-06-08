@@ -113,7 +113,77 @@ async function handleAsaasWebhook(req, res, env = "PRD") {
  */
 app.post("/webhook/mp/hml", async (req, res) => {
 
-    return handleAsaasWebhook(req, res, "HML");
+   try {
+
+        const paymentId = req.body?.data?.id;
+
+        if (!paymentId) {
+            return res.sendStatus(200);
+        }
+
+        const response = await fetch(
+            `https://api.mercadopago.com/v1/payments/${paymentId}`,
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${process.env.MP_TOKEN_HML}`
+                }
+            }
+        );
+
+        const payment = await response.json();
+
+        console.log(payment);
+
+        const txid = String(payment.id);
+
+        if (payment.status === "approved") {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'queued'
+                WHERE txid = ?
+                AND status = 'pending'
+            `, [txid]);
+
+            console.log("✅ PIX aprovado");
+        }
+
+        else if (
+            payment.status === "cancelled" ||
+            payment.status === "rejected"
+        ) {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'expired'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("⌛ PIX expirado");
+        }
+
+        else if (
+            payment.status === "refunded"
+        ) {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'refunded'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("💸 PIX estornado");
+        }
+
+        return res.sendStatus(200);
+
+    } catch (err) {
+
+        console.log(err);
+
+        return res.sendStatus(500);
+    }
 });
 
 /**
@@ -121,7 +191,77 @@ app.post("/webhook/mp/hml", async (req, res) => {
  */
 app.post("/webhook/mp/prd", async (req, res) => {
 
-    return handleAsaasWebhook(req, res, "PRD");
+    try {
+
+        const paymentId = req.body?.data?.id;
+
+        if (!paymentId) {
+            return res.sendStatus(200);
+        }
+
+        const response = await fetch(
+            `https://api.mercadopago.com/v1/payments/${paymentId}`,
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${process.env.MP_TOKEN_PRD}`
+                }
+            }
+        );
+
+        const payment = await response.json();
+
+        console.log(payment);
+
+        const txid = String(payment.id);
+
+        if (payment.status === "approved") {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'queued'
+                WHERE txid = ?
+                AND status = 'pending'
+            `, [txid]);
+
+            console.log("✅ PIX aprovado");
+        }
+
+        else if (
+            payment.status === "cancelled" ||
+            payment.status === "rejected"
+        ) {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'expired'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("⌛ PIX expirado");
+        }
+
+        else if (
+            payment.status === "refunded"
+        ) {
+
+            await db.query(`
+                UPDATE orders
+                SET status = 'refunded'
+                WHERE txid = ?
+            `, [txid]);
+
+            console.log("💸 PIX estornado");
+        }
+
+        return res.sendStatus(200);
+
+    } catch (err) {
+
+        console.log(err);
+
+        return res.sendStatus(500);
+    }
 });
 
 
