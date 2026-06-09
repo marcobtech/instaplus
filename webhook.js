@@ -302,7 +302,7 @@ function getProviderApi(provider) {
  */
 async function processOrders() {
 
-    console.log("V3.0📤 Processando fila...");
+    console.log("V4.0📤 Processando fila...");
 
     const [orders] = await db.query(`
         SELECT * FROM orders o
