@@ -201,7 +201,6 @@ app.post("/tasinsulp/webhook/prd", async (req, res) => {
         💰 Valor: R$ ${order.amount}
         📱 Plataforma: ${order.platform}
         📦 Quantidade: ${order.quantity}
-        📞 WhatsApp: ${order.whatsapp}
 
         🆔 Pedido: ${order.id}`);
                 }
@@ -305,7 +304,6 @@ app.post("/tasinsulp/webhook/hml", async (req, res) => {
         💰 Valor: R$ ${order.amount}
         📱 Plataforma: ${order.platform}
         📦 Quantidade: ${order.quantity}
-        📞 WhatsApp: ${order.whatsapp}
 
         🆔 Pedido: ${order.id}`);
                 }
@@ -409,7 +407,6 @@ app.post("/webhook/mp/hml", async (req, res) => {
         💰 Valor: R$ ${order.amount}
         📱 Plataforma: ${order.platform}
         📦 Quantidade: ${order.quantity}
-        📞 WhatsApp: ${order.whatsapp}
 
         🆔 Pedido: ${order.id}`);
                 }
