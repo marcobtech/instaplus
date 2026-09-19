@@ -349,6 +349,208 @@ app.post("/tasinsulp/webhook/hml", async (req, res) => {
 
 
 /**
+ * 🚀 WEBHOOK MERCADO PAGO - PRODUÇÃO
+ */
+app.post("/webhook/mp/prd", async (req, res) => {
+
+    try {
+
+        const paymentId = req.body?.data?.id;
+
+        if (!paymentId) {
+            return res.sendStatus(200);
+        }
+
+        // =====================================================
+        // CONSULTA PAGAMENTO NO MERCADO PAGO
+        // =====================================================
+
+        const response = await fetch(
+            `https://api.mercadopago.com/v1/payments/${paymentId}`,
+            {
+                headers: {
+                    Authorization:
+                        `Bearer ${process.env.MP_TOKEN_PRD}`
+                }
+            }
+        );
+
+        const payment = await response.json();
+
+        console.log("💳 Mercado Pago:", payment);
+
+        const txid = String(payment.id);
+
+        // =====================================================
+        // VERIFICA ONDE O PAGAMENTO EXISTE
+        // =====================================================
+
+        const [orders] = await db.query(`
+            SELECT *
+            FROM orders
+            WHERE txid = ?
+            LIMIT 1
+        `, [txid]);
+
+        const [comprasTvbox] = await db.query(`
+            SELECT *
+            FROM comprastvbox
+            WHERE txid = ?
+            LIMIT 1
+        `, [txid]);
+
+
+        // =====================================================
+        // PAGAMENTO APROVADO
+        // =====================================================
+
+        if (payment.status === "approved") {
+
+            // =================================================
+            // PEDIDO NORMAL - ORDERS
+            // =================================================
+
+            if (orders.length > 0) {
+
+                const [update] = await db.query(`
+                    UPDATE orders
+                    SET status = 'queued'
+                    WHERE txid = ?
+                    AND status = 'pending'
+                `, [txid]);
+
+                console.log("✅ PIX aprovado - ORDERS");
+                console.log("Rows:", update.affectedRows);
+
+                if (update.affectedRows > 0) {
+
+                    const order = orders[0];
+
+                    await sendTelegram(`🔥 NOVA VENDA
+
+                    💰 Valor: R$ ${order.amount}
+                    📱 Plataforma: ${order.platform}
+                    📦 Quantidade: ${order.quantity}
+                    📞 WhatsApp: ${order.whatsapp}
+                    🆔 Pedido: ${order.id}`);
+                }
+            }
+
+            // =================================================
+            // COMPRA TV BOX
+            // =================================================
+
+            else if (comprasTvbox.length > 0) {
+
+                const [updateCompraBox]  = await db.query(`
+                    UPDATE comprastvbox
+                    SET status = 'approved'
+                    WHERE txid = ?
+                `, [txid]);
+
+                console.log("✅ PIX aprovado - COMPRAS TV BOX");
+                console.log("🆔 TXID:", txid);
+
+                if (updateCompraBox.affectedRows > 0) {
+
+                    const compra = comprasTvbox[0];
+
+                    await sendTelegram(`🔥 NOVA VENDA TVBOX
+
+                    Valor: R$ ${compra.amount}
+                    Nome: ${compra.nome}
+                    WhatsApp: ${compra.whatsapp}
+                    E-mail: ${compra.email}
+                    🆔 Pedido: ${compra.id}`);
+                }
+            }
+
+            // =================================================
+            // NÃO ENCONTROU
+            // =================================================
+
+            else {
+
+                console.log("⚠️ Pagamento aprovado, mas TXID não encontrado");
+                console.log("TXID:", txid);
+            }
+        }
+
+
+        // =====================================================
+        // PAGAMENTO CANCELADO / REJEITADO
+        // =====================================================
+
+        else if (
+            payment.status === "cancelled" ||
+            payment.status === "rejected"
+        ) {
+
+            if (orders.length > 0) {
+
+                await db.query(`
+                    UPDATE orders
+                    SET status = 'expired'
+                    WHERE txid = ?
+                `, [txid]);
+
+                console.log("⌛ PIX expirado - ORDERS");
+            }
+
+            else if (comprasTvbox.length > 0) {
+
+                await db.query(`
+                    UPDATE comprastvbox
+                    SET status = 'expired'
+                    WHERE txid = ?
+                `, [txid]);
+
+                console.log("⌛ PIX expirado - COMPRAS TV BOX");
+            }
+        }
+
+
+        // =====================================================
+        // PAGAMENTO ESTORNADO
+        // =====================================================
+
+        else if (payment.status === "refunded") {
+
+            if (orders.length > 0) {
+
+                await db.query(`
+                    UPDATE orders
+                    SET status = 'refunded'
+                    WHERE txid = ?
+                `, [txid]);
+
+                console.log("💸 PIX estornado - ORDERS");
+            }
+
+            else if (comprasTvbox.length > 0) {
+
+                await db.query(`
+                    UPDATE comprastvbox
+                    SET status = 'refunded'
+                    WHERE txid = ?
+                `, [txid]);
+
+                console.log("💸 PIX estornado - COMPRAS TV BOX");
+            }
+        }
+
+
+        return res.sendStatus(200);
+
+    } catch (err) {
+
+        console.log("❌ Erro webhook Mercado Pago:", err);
+
+        return res.sendStatus(500);
+    }
+});
+
+/**
  * 🧪 SANDBOX
  */
 app.post("/webhook/mp/hml", async (req, res) => {
@@ -453,105 +655,105 @@ app.post("/webhook/mp/hml", async (req, res) => {
 /**
  * 🚀 PRODUÇÃO
  */
-app.post("/webhook/mp/prd", async (req, res) => {
+// app.post("/webhook/mp/prd", async (req, res) => {
 
-    try {
+//     try {
 
-        const paymentId = req.body?.data?.id;
+//         const paymentId = req.body?.data?.id;
 
-        if (!paymentId) {
-            return res.sendStatus(200);
-        }
+//         if (!paymentId) {
+//             return res.sendStatus(200);
+//         }
 
-        const response = await fetch(
-            `https://api.mercadopago.com/v1/payments/${paymentId}`,
-            {
-                headers: {
-                    Authorization:
-                        `Bearer ${process.env.MP_TOKEN_PRD}`
-                }
-            }
-        );
+//         const response = await fetch(
+//             `https://api.mercadopago.com/v1/payments/${paymentId}`,
+//             {
+//                 headers: {
+//                     Authorization:
+//                         `Bearer ${process.env.MP_TOKEN_PRD}`
+//                 }
+//             }
+//         );
 
-        const payment = await response.json();
+//         const payment = await response.json();
 
-        console.log(payment);
+//         console.log(payment);
 
-        const txid = String(payment.id);
+//         const txid = String(payment.id);
 
-        if (payment.status === "approved") {
+//         if (payment.status === "approved") {
 
-            const [update] = await db.query(`
-                UPDATE orders
-                SET status = 'queued'
-                WHERE txid = ?
-                AND status = 'pending'
-            `, [txid]);
+//             const [update] = await db.query(`
+//                 UPDATE orders
+//                 SET status = 'queued'
+//                 WHERE txid = ?
+//                 AND status = 'pending'
+//             `, [txid]);
 
-            console.log("✅ PIX aprovado");
-            console.log("Rows:", update.affectedRows);
+//             console.log("✅ PIX aprovado");
+//             console.log("Rows:", update.affectedRows);
 
-            if (update.affectedRows > 0) {
+//             if (update.affectedRows > 0) {
 
-                const [orderRows] = await db.query(`
-                    SELECT *
-                    FROM orders
-                    WHERE txid = ?
-                    LIMIT 1
-                `, [txid]);
+//                 const [orderRows] = await db.query(`
+//                     SELECT *
+//                     FROM orders
+//                     WHERE txid = ?
+//                     LIMIT 1
+//                 `, [txid]);
 
-                const order = orderRows[0];
+//                 const order = orderRows[0];
 
-                if (order) {
+//                 if (order) {
 
-                    await sendTelegram(`🔥 NOVA VENDA
+//                     await sendTelegram(`🔥 NOVA VENDA
 
-        💰 Valor: R$ ${order.amount}
-        📱 Plataforma: ${order.platform}
-        📦 Quantidade: ${order.quantity}
-        📞 WhatsApp: ${order.whatsapp}
+//         💰 Valor: R$ ${order.amount}
+//         📱 Plataforma: ${order.platform}
+//         📦 Quantidade: ${order.quantity}
+//         📞 WhatsApp: ${order.whatsapp}
 
-        🆔 Pedido: ${order.id}`);
-                }
-            }
-        }
+//         🆔 Pedido: ${order.id}`);
+//                 }
+//             }
+//         }
 
-        else if (
-            payment.status === "cancelled" ||
-            payment.status === "rejected"
-        ) {
+//         else if (
+//             payment.status === "cancelled" ||
+//             payment.status === "rejected"
+//         ) {
 
-            await db.query(`
-                UPDATE orders
-                SET status = 'expired'
-                WHERE txid = ?
-            `, [txid]);
+//             await db.query(`
+//                 UPDATE orders
+//                 SET status = 'expired'
+//                 WHERE txid = ?
+//             `, [txid]);
 
-            console.log("⌛ PIX expirado");
-        }
+//             console.log("⌛ PIX expirado");
+//         }
 
-        else if (
-            payment.status === "refunded"
-        ) {
+//         else if (
+//             payment.status === "refunded"
+//         ) {
 
-            await db.query(`
-                UPDATE orders
-                SET status = 'refunded'
-                WHERE txid = ?
-            `, [txid]);
+//             await db.query(`
+//                 UPDATE orders
+//                 SET status = 'refunded'
+//                 WHERE txid = ?
+//             `, [txid]);
 
-            console.log("💸 PIX estornado");
-        }
+//             console.log("💸 PIX estornado");
+//         }
 
-        return res.sendStatus(200);
+//         return res.sendStatus(200);
 
-    } catch (err) {
+//     } catch (err) {
 
-        console.log(err);
+//         console.log(err);
 
-        return res.sendStatus(500);
-    }
-});
+//         return res.sendStatus(500);
+//     }
+// });
 
 
 /**
